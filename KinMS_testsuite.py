@@ -10,18 +10,18 @@ import time
 def gaussian(x,x0,sigma):
   return np.exp(-np.power((x - x0)/(sigma), 2.)/2.)
 
-def makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,posang=0,overcube=False,pvdthick=2,nconts=11., **kwargs):
+def makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,posang=0,overcube=False,pvdthick=2,nconts=11.,title=False, **kwargs):
     
 # ;;;; Create plot data from cube ;;;;
     mom0rot=f.sum(axis=2)
     if np.any(overcube): mom0over=overcube.sum(axis=2)
-    x1=np.arange(-xsize/2.,xsize/2.,dx)
-    y1=np.arange(-ysize/2.,ysize/2.,dy)
+    x1=np.arange(-xsize/2.,xsize/2.,cellsize)
+    y1=np.arange(-ysize/2.,ysize/2.,cellsize)
     v1=np.arange(-vsize/2.,vsize/2.,dv)
 
     mom1=(mom0rot*0.0)-10000.0
-    for i in range(0,int(xsize/dx)):
-         for j in range(0,int(ysize/dy)):
+    for i in range(0,int(xsize/cellsize)):
+         for j in range(0,int(ysize/cellsize)):
              if mom0rot[i,j] > 0.1*np.max(mom0rot):
                  mom1[i,j]=(v1*f[i,j,:]).sum()/f[i,j,:].sum()
 
@@ -30,12 +30,12 @@ def makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,posang=0,overcube=False,pvdt
     pvdcube=ndimage.interpolation.rotate(f, 90-posang, axes=(1, 0), reshape=False)
     if np.any(overcube): pvdcubeover=ndimage.interpolation.rotate(overcube, 90-posang, axes=(1, 0), reshape=False)
         
-    pvd=pvdcube[:,(ysize/2.)-pvdthick:(ysize/2.)+pvdthick,:].sum(axis=1)
-    if np.any(overcube): pvdover=pvdcubeover[:,(ysize/2.)-pvdthick:(ysize/2.)+pvdthick,:].sum(axis=1)
+    pvd=pvdcube[:,np.int((ysize/2.)-pvdthick):np.int((ysize/2.)+pvdthick),:].sum(axis=1)
+    if np.any(overcube): pvdover=pvdcubeover[:,np.int((ysize/2.)-pvdthick):np.int((ysize/2.)+pvdthick),:].sum(axis=1)
     
     if not isinstance(beamsize, (list, tuple, np.ndarray)):
         beamsize=np.array([beamsize,beamsize,0])
-    beamtot=(makebeam(xsize,ysize,[beamsize[0]/dx,beamsize[1]/dy],rot=beamsize[2])).sum()
+    beamtot=(makebeam(xsize,ysize,[beamsize[0]/cellsize,beamsize[1]/cellsize],rot=beamsize[2])).sum()
     spec=f.sum(axis=0).sum(axis=0)/beamtot
     if np.any(overcube): specover=overcube.sum(axis=0).sum(axis=0)/beamtot
      
@@ -62,7 +62,7 @@ def makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,posang=0,overcube=False,pvdt
     plt.xlabel('Offset (")')
     plt.ylabel(r'Velocity (km s$^{-1}$)')
     ax3.contourf(x1,v1,pvd.T,levels=np.linspace(1,0,num=10,endpoint=False)[::-1]*np.max(pvd), cmap="YlOrBr" ,aspect='auto')
-    if np.any(overcube): ax3.contour(x1,v1*(-1),pvdover.T,colors=('black'),levels=np.arange(0.1, 1.1, 0.1)*np.max(pvdover))
+    if np.any(overcube): ax3.contour(x1,v1,pvdover.T,colors=('black'),levels=np.arange(0.1, 1.1, 0.1)*np.max(pvdover))
     if 'vrange' in kwargs: ax3.set_ylim(kwargs['vrange'])
     if 'xrange' in kwargs: ax3.set_xlim(kwargs['xrange'])
     ax4 = fig.add_subplot(224)
@@ -71,6 +71,7 @@ def makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,posang=0,overcube=False,pvdt
     ax4.plot(v1,spec, drawstyle='steps')
     if np.any(overcube): ax4.plot(v1,specover,'r', drawstyle='steps')
     if 'vrange' in kwargs: ax4.set_xlim(kwargs['vrange'])
+    if title: plt.suptitle(title)
     plt.show()
 # ;;;;
 
@@ -96,8 +97,7 @@ def KinMStest_expdisk(scalerad=10.,inc=45.):
     xsize=128
     ysize=128
     vsize=1400
-    dx=1
-    dy=1
+    cellsize=1
     dv=10
     beamsize=[4.,4.,0.]
     nsamps=5e5
@@ -110,11 +110,57 @@ def KinMStest_expdisk(scalerad=10.,inc=45.):
 # ;;;;
 
 # ;;;; Simulate ;;;;
-    f=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,sbprof=fx,sbrad=x,velrad=x,velprof=vel,nsamps=nsamps,intflux=30.,posang=270,gassigma=10.)
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,posAng=270,gasSigma=10.)
 
 # ;;;; Plot
-    plot=makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,posang=270.)
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,posang=270.)
 
+
+
+def KinMStest_expdisk_gasgrav(scalerad=5.,inc=45.,gasmass=5e10):
+# ;;;;;;;;;;;
+# ;
+# ; A test procedure to demonstrate the KinMS code, and check if it
+# ; works on your system. This procedure demonstrates how to create a simulation of an
+# ; exponential disk of molecular gas, including the effect of the potential of the gas on its own rotation.
+# ; The user can input values for the scalerad and inc variables, and the procedure will 
+# ; the create the simulation and display it to screen. 
+# ;
+# ;  INPUTS:
+# ;       Scalerad -    Scale radius for the exponential disk (arcseconds)
+# ;       Inc      -    Inclination to project the disk (degrees)
+# ;       Gasmass  -    Total mass of the gas (solar masses)
+# ;
+# ;;;;;;;;;;;
+
+# ;;;; Setup cube parameters ;;;;
+    xsize=64
+    ysize=64
+    vsize=1400
+    cellsize=1
+    dv=10
+    beamsize=[4.,4.,0.]
+    nsamps=5e5
+    dist=16.5 # Mpc
+
+# ;;;; Set up exponential disk SB profile/velocity ;;;;
+    x=np.arange(0,100,0.1)
+    fx = np.exp(-x/scalerad)
+    velfunc = interpolate.interp1d([0.0,0.5,1,3,500],[0,50,100,210,210], kind='linear')
+    vel=velfunc(x)
+# ;;;;
+
+# ;;;; Simulate and plot ;;;;
+    plt.ion()
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,posAng=270,gasSigma=10.)
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,posang=270.,title="Without Potential of Gas")
+        
+
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,posAng=270,gasSigma=10.,gasGrav=np.array([gasmass,dist]))
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,posang=270.,title="With Potential of Gas Included")
+
+
+    
 
 def KinMStest_ngc4324():
 # ;;;;;;;;;;;
@@ -131,8 +177,7 @@ def KinMStest_ngc4324():
     xsize=100. # arcseconds
     ysize=100. #;; arcseconds
     vsize=420. #;; km/s
-    dx=1. #;; arcseconds/pixel
-    dy=1. #;; arcseconds/pixel
+    cellsize=1. #;; arcseconds/pixel
     dv=20. #;; km/s/channel
     beamsize=np.array([4.68,3.85,15.54]) #;; arcseconds
 # ;;;
@@ -140,7 +185,7 @@ def KinMStest_ngc4324():
 # ;;; Define the gas distribution required ;;;
     diskthick=1. # arcseconds
     inc=65. # degrees
-    posang=230.-180 # degrees
+    posang=230. # degrees
     x=np.arange(0.,64.)
     fx = 0.1*gaussian(x,20.0,2.0)
     velfunc = interpolate.interp1d([0.0,1,3,5,7,10,200],[0,50,100,175,175,175,175], kind='linear')
@@ -150,7 +195,7 @@ def KinMStest_ngc4324():
 # ;;;
 
 # ;;; Run KinMS
-    f=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,sbprof=fx,sbrad=x,velrad=x,velprof=vel,nsamps=5e5,posang=posang,intflux=27.2,phasecen=phasecen,voffset=voffset,gassigma=10.,filename="NGC4234_test")
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=5e5,posAng=posang,intFlux=27.2,phaseCen=phasecen,vOffset=voffset,gasSigma=10.,fileName="NGC4234_test")
 # ;;;
 
 # ;;; Read in data
@@ -162,7 +207,7 @@ def KinMStest_ngc4324():
 # ;;;
 
 # ;;; Create the plot 
-    plot=makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,posang=posang,overcube=scidata,xrange=[-28,28],yrange=[-28,28],pvdthick=4.)
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,posang=posang,overcube=scidata,xrange=[-28,28],yrange=[-28,28],pvdthick=4.)
 
 def KinMStest_inclouds():
 # ;;;;;;;;;;;
@@ -179,8 +224,7 @@ def KinMStest_inclouds():
     xsize=128
     ysize=128
     vsize=1400
-    dx=1
-    dy=1
+    cellsize=1.0
     dv=10
     beamsize=[4.,4.,0]
     inc=35.
@@ -194,18 +238,18 @@ def KinMStest_inclouds():
 # ;;;;
 
 # ;;;; run the simulation with a velocity curve ;;;;
-    f=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,intflux=30.,inclouds=inclouds,velprof=vel,velrad=x,posang=90.)
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,intFlux=30.,inClouds=inclouds,velProf=vel,velRad=x,posAng=90.)
 # ;;;;
 # ;;; Create the plot 
 
     mom0rot=f.sum(axis=2)
-    x1=np.arange(-xsize/2.,xsize/2.,dx)
-    y1=np.arange(-ysize/2.,ysize/2.,dy)
+    x1=np.arange(-xsize/2.,xsize/2.,cellsize)
+    y1=np.arange(-ysize/2.,ysize/2.,cellsize)
     v1=np.arange(-vsize/2.,vsize/2.,dv)
 
     mom1=(mom0rot*0.0)-10000.0
-    for i in range(0,int(xsize/dx)):
-         for j in range(0,int(ysize/dy)):
+    for i in range(0,int(xsize/cellsize)):
+         for j in range(0,int(ysize/cellsize)):
              if mom0rot[i,j] > 0.1*np.max(mom0rot):
                  mom1[i,j]=(v1*f[i,j,:]).sum()/f[i,j,:].sum()
                  
@@ -239,8 +283,7 @@ def KinMStest_inclouds_spiral():
     xsize=128*2
     ysize=128*2
     vsize=1400
-    dx=1
-    dy=1
+    cellsize=1
     dv=10
     beamsize=4.
     inc=55.
@@ -268,11 +311,11 @@ def KinMStest_inclouds_spiral():
 # ;;;;
 
 # ;;;; run the simulation ;;;;
-    cube=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,intflux=30.,inclouds=inclouds,velprof=vel,velrad=x,posang=90)
+    cube=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,intFlux=30.,inClouds=inclouds,velProf=vel,velRad=x,posAng=90)
 # ;;;;
 
 # ;;;; Plot the results ;;;;
-    plot=makeplots(cube,xsize,ysize,vsize,dx,dy,dv,beamsize,pvdthick=50.)
+    plot=makeplots(cube,xsize,ysize,vsize,cellsize,dv,beamsize,pvdthick=50.)
 # ;;;;
 
 
@@ -295,8 +338,7 @@ def KinMStest_infits():
     xsize=128
     ysize=128
     vsize=500
-    dx=1
-    dy=1
+    cellsize=1.0
     dv=10
     beamsize=4.
     inc=0.
@@ -330,9 +372,9 @@ def KinMStest_infits():
 #
 # ;;;; run the simulation ;;;;
     
-    cube=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,intflux=30.,inclouds=inclouds,vlos_clouds=vlos_clouds,flux_clouds=flux_clouds)
+    cube=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,intFlux=30.,inClouds=inclouds,vLOS_clouds=vlos_clouds,flux_clouds=flux_clouds)
 # ;;;; Plot the results ;;;;
-    plot=makeplots(cube,xsize,ysize,vsize,dx,dy,dv,beamsize)
+    plot=makeplots(cube,xsize,ysize,vsize,cellsize,dv,beamsize)
 # ;;;;
 
 
@@ -353,8 +395,7 @@ def KinMStest_veldisp():
     xsize=128
     ysize=128
     vsize=1400
-    dx=1
-    dy=1
+    cellsize=1.0
     dv=10
     beamsize=2.
     nsamps=5e5
@@ -373,11 +414,11 @@ def KinMStest_veldisp():
 # ;;;;
 
 # ;;;; Simulate ;;;;
-    f=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,sbprof=fx,sbrad=x,velrad=x,velprof=vel,nsamps=nsamps,intflux=30.,gassigma=gassigma,posang=90)
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,gasSigma=gassigma,posAng=90)
 # ;;;;
 
 # ;;;; Plot
-    plot=makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,vrange=[-200,200],posang=90)
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,vrange=[-200,200],posang=90)
 
 
 def KinMStest_diskthick():
@@ -397,8 +438,7 @@ def KinMStest_diskthick():
     xsize=128
     ysize=128
     vsize=1400
-    dx=1
-    dy=1
+    cellsize=1.0
     dv=10
     beamsize=2.
     nsamps=5e5
@@ -417,11 +457,11 @@ def KinMStest_diskthick():
 # ;;;;
 
 # ;;;; Simulate ;;;;
-    f=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,sbprof=fx,sbrad=x,velrad=x,velprof=vel,nsamps=nsamps,intflux=30.,diskthick=diskthick,posang=270)
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,diskThick=diskthick,posAng=270)
 # ;;;;
 
 # ;;;; Plot
-    plot=makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,vrange=[-250,250],posang=90,xrange=[-30,30],yrange=[-30,30])
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,vrange=[-250,250],posang=90,xrange=[-30,30],yrange=[-30,30])
 
 
 def KinMStest_warp():
@@ -437,8 +477,7 @@ def KinMStest_warp():
     xsize=128
     ysize=128
     vsize=1400
-    dx=1
-    dy=1
+    cellsize=1.0
     dv=10
     beamsize=2.
     nsamps=5e5
@@ -457,11 +496,68 @@ def KinMStest_warp():
 # ;;;;
 
 # ;;;; Simulate ;;;;
-    f=KinMS(xsize,ysize,vsize,dx,dy,dv,beamsize,inc,sbprof=fx,sbrad=x,velrad=x,velprof=vel,nsamps=nsamps,intflux=30.,posang=posang)
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,posAng=posang)
 # ;;;;
 
 # ;;;; Plot
-    plot=makeplots(f,xsize,ysize,vsize,dx,dy,dv,beamsize,vrange=[-250,250],posang=270)
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,vrange=[-250,250],posang=270)
+
+def KinMStest_retclouds():
+# ;;;;;;;;;;;
+# ;
+# ; A test procedure to demonstrate the KinMS code, and check if it
+# ; works on your system. This procedure demonstrates how to use the
+# ; return clouds feature to recursivly build models - here a 
+# ; misaligned central and outer disc.
+# ;
+# ;;;;;;;;;;;
+
+# ;;;; Setup cube parameters ;;;;
+    xsize=64.
+    ysize=64.
+    vsize=1000
+    cellsize=1
+    dv=10
+    beamsize=[4.,4.,0.]
+
+
+# ;;;; Set up exponential disk SB profile/velocity for disc one ;;;;
+    inc=75.
+    x=np.arange(0,100,0.1)
+    fx = np.exp(-x/4.)
+    fx[np.where(x > 5.)]=0.0
+    velfunc = interpolate.interp1d([0.0,0.5,1,3,500],[0,50,100,210,210], kind='linear')
+    vel=velfunc(x)
+    nsamps=5e4
+# ;;;;
+
+# ;;;; Simulate disc 1 ;;;;
+    __,inclouds1,vlos1=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,posAng=90,gasSigma=10.,returnClouds=True)
+
+# ;;;; Set up exponential disk SB profile for disc two ;;;;
+    inc=35.
+    x=np.arange(0,100,0.1)
+    fx = np.exp(-x/15.)
+    fx[np.where(x < 10.)]=0.0
+    nsamps=1e6
+# ;;;;
+
+# ;;;; Simulate disc 2 ;;;;
+    __,inclouds2,vlos2=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,sbProf=fx,sbRad=x,velRad=x,velProf=vel,nSamps=nsamps,intFlux=30.,posAng=270,gasSigma=10.,returnClouds=True)
+
+# ;;;; Combine ;;;;
+
+    inclouds=np.concatenate((inclouds1,inclouds2),axis=0)
+    vlos=np.concatenate((vlos1,vlos2))
+
+# ;;;; Simulate whole thing ;;;;
+    
+    f=KinMS(xsize,ysize,vsize,cellsize,dv,beamsize,inc,inClouds=inclouds,vLOS_clouds=vlos,intFlux=30.)
+    
+
+# ;;;; Plot
+    plot=makeplots(f,xsize,ysize,vsize,cellsize,dv,beamsize,posang=270.)
+
 
 def run_tests():
     print("Test - simulate the gas ring in NGC4324")
@@ -488,3 +584,9 @@ def run_tests():
     print("Test - simulate a warped exponential disk")
     print("[Close plot to finish]")
     KinMStest_warp()
+    print("Test - using the returnclouds mechanism")
+    print("[Close plot to finish]")
+    KinMStest_retclouds()
+    print("Test - using the gravgas mechanism")
+    KinMStest_expdisk_gasgrav()
+    
