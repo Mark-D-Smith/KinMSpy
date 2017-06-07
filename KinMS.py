@@ -1,7 +1,7 @@
+# This Python file uses the following encoding: utf-8
 """
 Copyright (C) 2016, Timothy A. Davis
 E-mail: DavisT -at- cardiff.ac.uk
-
 Updated versions of the software are available through github:
 https://github.com/TimothyADavis/KinMSpy
  
@@ -22,7 +22,6 @@ from makebeam import makebeam
 
 def kinms_sampleFromArbDist_oneSided(sbRad,sbProf,nSamps,seed,diskThick=0.0):
     """
-
     This function takes the input radial distribution and generates the positions of
     `nsamps` cloudlets from under it. It also accounts for disk thickness
     if requested. Returns 
@@ -46,7 +45,6 @@ def kinms_sampleFromArbDist_oneSided(sbRad,sbProf,nSamps,seed,diskThick=0.0):
             The disc scaleheight. If a single value then this is used at all radii.
             If a ndarray then it should have the same length as sbrad, and will be 
             the disc thickness as a function of sbrad. 
-
     Returns
     -------
     inClouds : np.ndarray of double
@@ -93,7 +91,6 @@ def kinms_sampleFromArbDist_oneSided(sbRad,sbProf,nSamps,seed,diskThick=0.0):
 
 def kinms_create_velField_oneSided(velRad,velProf,r_flat,inc,posAng,gasSigma,seed,xPos,yPos,vPhaseCent=[0.0,0.0],vPosAng=False,vRadial=0.0,posAng_rad=0.0,inc_rad=0.0):
     """
-
     This function takes the input circular velocity distribution
     and the position of point sources and creates the velocity field 
     taking into account warps, inflow/outflow etc as required.
@@ -243,7 +240,7 @@ def gasgravity_velocity(xPos,yPos,zPos,massDist,velRad):
             Addition to the circular velocity just due to the mass of the gas itself, in units of km/s.
     """
     rad = np.sqrt((xPos**2) + (yPos**2) + (zPos**2))						## 3D radius	
-    cumMass = ((np.arange(xpos.size + 1)) * (massDist[0] / np.float(xpos.size)))					    ## cumulative mass
+    cumMass = ((np.arange(xPos.size + 1)) * (massDist[0] / np.float(xPos.size)))					    ## cumulative mass
     cumMass_interFunc = interpolate.interp1d(np.append(np.insert(sorted(rad),0,0),np.max(velRad).clip(min=np.max(rad), max=None)+1),np.append(cumMass,np.max(cumMass)),kind='linear')
     if velRad[0] == 0.0:
         return 	np.append(0.0,np.sqrt((4.301e-3 * cumMass_interFunc(velRad[1:]))/(4.84 * velRad[1:] * massDist[1])))					    ## return velocity
@@ -256,7 +253,6 @@ def KinMS(xs,ys,vs,cellSize,dv,beamSize,inc,gasSigma=0,sbProf=[],sbRad=[],velRad
     
     The main KinMS function. Takes inputs specifing the observing parameters and type of model.
     Returns the created model cube.
-
     Parameters
     ----------
     xs : float
@@ -381,7 +377,6 @@ def KinMS(xs,ys,vs,cellSize,dv,beamSize,inc,gasSigma=0,sbProf=[],sbRad=[],velRad
         (Default value= False)
         If set True then KinMS returns the created `inclouds` and `vlos_clouds`
         in addition to the cube.
-
     Other Parameters
     ----------------
     
@@ -406,7 +401,6 @@ def KinMS(xs,ys,vs,cellSize,dv,beamSize,inc,gasSigma=0,sbProf=[],sbRad=[],velRad
     vsys : double, optional
          (Default value = 0)
         Systemic velocity (km/s). 
-
     Returns
     -------
     
@@ -517,11 +511,11 @@ def KinMS(xs,ys,vs,cellSize,dv,beamSize,inc,gasSigma=0,sbProf=[],sbRad=[],velRad
         if not isinstance(flux_clouds, (list, tuple, np.ndarray)):
             cube,edges = np.histogramdd(clouds2do,bins=(xSize,ySize,vSize),range=((0,xSize),(0,ySize),(0,vSize)))
         else:
-            cube = np.zeros((xSize,ySize,vSize))
+            cube = np.zeros((int(xSize),int(ySize),int(vSize)))
             flux_clouds = flux_clouds[subs]
             for i in range(0, nsubs):
                 const = flux_clouds[i]
-                csub = (clouds2do[i,0],clouds2do[i,1],clouds2do[i,2])
+                csub = (int(clouds2do[i,0]),int(clouds2do[i,1]),int(clouds2do[i,2]))
                 cube[csub] = cube[csub] + const
     
     # Convolve with the beam point spread function to obtain a dirty cube
